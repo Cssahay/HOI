@@ -1,31 +1,62 @@
-// index.js
-const express = require('express');
-const bodyParser = require('body-parser');
-const cors = require('cors');
+const chatMessages = document.getElementById('chatMessages');
+const chatInputForm = document.getElementById('chatInputForm');
+const chatInput = document.getElementById('chatInput');
+const clearChatBtn = document.getElementById('clearChatBtn');
+const aSelector = document.getElementById('A-selector');
+const bSelector = document.getElementById('B-selector');
+const chatHeader = document.querySelector('.chat-header');
 
-const app = express();
-const PORT = 3000;
+let messageSender = 'A';
 
-app.use(cors());
-app.use(bodyParser.json());
-app.use(express.static('public'));
+const updateSender = (name) => {
+  messageSender = name;
+  chatHeader.innerText = `${name} chatting...`;
+  chatInput.placeholder = `Type here, ${name}...`;
+  aSelector.classList.toggle('active', name === 'A');
+  bSelector.classList.toggle('active', name === 'B');
+};
 
-let messages = [];
+// Event listeners for sender
+aSelector.onclick = () => updateSender('A');
+bSelector.onclick = () => updateSender('B');
 
-// Get messages
-app.get('/api/messages', (req, res) => res.json(messages));
+// Fetch and display messages
+const fetchMessages = async () => {
+  const response = await fetch('/api/messages');
+  const messages = await response.json();
+  chatMessages.innerHTML = messages.map(createMessageHTML).join('');
+};
 
-// Post a new message
-app.post('/api/messages', (req, res) => {
-  const { sender, text, timestamp } = req.body;
-  messages.push({ sender, text, timestamp });
-  res.status(201).json({ success: true });
-});
+// HTML for a single message
+const createMessageHTML = (message) => `
+  <div class="message ${message.sender === 'A' ? 'blue-bg' : 'gray-bg'}">
+    <div class="message-sender">${message.sender}</div>
+    <div>${message.text}</div>
+    <div class="message-timestamp">${message.timestamp}</div>
+  </div>
+`;
 
-// Clear all messages
-app.delete('/api/messages', (req, res) => {
-  messages = [];
-  res.status(200).json({ success: true });
-});
+// Send new message
+chatInputForm.onsubmit = async (e) => {
+  e.preventDefault();
+  const timestamp = new Date().toLocaleTimeString();
+  const message = { sender: messageSender, text: chatInput.value, timestamp };
 
-app.listen(PORT, () => console.log(`HOI server running on http://localhost:${PORT}`));
+  await fetch('/api/messages', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(message),
+  });
+
+  chatMessages.innerHTML += createMessageHTML(message);
+  chatInputForm.reset();
+  chatMessages.scrollTop = chatMessages.scrollHeight;
+};
+
+// Clear chat
+clearChatBtn.onclick = async () => {
+  await fetch('/api/messages', { method: 'DELETE' });
+  chatMessages.innerHTML = '';
+};
+
+fetchMessages();
